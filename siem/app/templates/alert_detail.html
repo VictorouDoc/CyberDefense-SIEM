@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Alert #{{ alert.id }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/alerts">Alerts</a></li>
+        <li class="breadcrumb-item active">Alert #{{ alert.id }}</li>
+    </ol>
+</nav>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h4 class="mb-0">
+            {% if alert.severity == 'critical' %}
+            <span class="badge bg-danger">CRITICAL</span>
+            {% elif alert.severity == 'high' %}
+            <span class="badge bg-warning text-dark">HIGH</span>
+            {% elif alert.severity == 'medium' %}
+            <span class="badge bg-info">MEDIUM</span>
+            {% else %}
+            <span class="badge bg-secondary">LOW</span>
+            {% endif %}
+            {{ alert.title }}
+        </h4>
+        <span class="badge bg-{% if alert.status == 'new' %}danger{% elif alert.status == 'resolved' %}success{% else %}warning{% endif %}">
+            {{ alert.status.upper() }}
+        </span>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Created:</strong> {{ alert.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                <p><strong>Source IP:</strong> {{ alert.source_ip or 'N/A' }}</p>
+                <p><strong>Destination IP:</strong> {{ alert.dest_ip or 'N/A' }}</p>
+                <p><strong>Rule:</strong> {{ alert.rule_name or 'N/A' }}</p>
+                <p><strong>Event Count:</strong> {{ alert.event_count }}</p>
+            </div>
+            <div class="col-md-6">
+                <h5>Description</h5>
+                <p>{{ alert.description or 'No description available.' }}</p>
+            </div>
+        </div>
+
+        <hr>
+
+        <h5>Update Status</h5>
+        <form method="post" action="/alerts/{{ alert.id }}/update" class="row g-3">
+            <div class="col-md-4">
+                <select class="form-select" name="status">
+                    <option value="new" {% if alert.status == 'new' %}selected{% endif %}>New</option>
+                    <option value="ack" {% if alert.status == 'ack' %}selected{% endif %}>Acknowledged</option>
+                    <option value="investigating" {% if alert.status == 'investigating' %}selected{% endif %}>Investigating</option>
+                    <option value="resolved" {% if alert.status == 'resolved' %}selected{% endif %}>Resolved</option>
+                    <option value="false_positive" {% if alert.status == 'false_positive' %}selected{% endif %}>False Positive</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary">Update</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

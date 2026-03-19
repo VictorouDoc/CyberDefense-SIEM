@@ -1,0 +1,141 @@
+# ============================================================================
+# [ORGANIZATION] - Custom Suricata Rules
+# Blue Team - Custom Suricata Rules
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# SSH MONITORING (Ports 221-230)
+# ----------------------------------------------------------------------------
+
+# SSH Brute Force Detection - Multiple failed attempts
+alert ssh any any -> $SSH_SERVERS $SSH_PORTS (msg:"BLUETEAM SSH Brute Force Attempt"; \
+    flow:to_server,established; \
+    threshold:type threshold, track by_src, count 5, seconds 60; \
+    classtype:attempted-admin; sid:1000001; rev:1;)
+
+# SSH Connection from External Network
+alert tcp $EXTERNAL_NET any -> $SSH_SERVERS $SSH_PORTS (msg:"BLUETEAM SSH External Connection Attempt"; \
+    flow:to_server; flags:S; \
+    classtype:network-scan; sid:1000002; rev:1;)
+
+# SSH Root Login Attempt
+alert ssh any any -> $SSH_SERVERS $SSH_PORTS (msg:"BLUETEAM SSH Root Login Attempt"; \
+    flow:to_server,established; \
+    content:"root"; nocase; \
+    classtype:attempted-admin; sid:1000003; rev:1;)
+
+# ----------------------------------------------------------------------------
+# HTTP MONITORING (Ports 8081-8090)
+# ----------------------------------------------------------------------------
+
+# HTTP SQL Injection Attempt
+alert http any any -> $HTTP_SERVERS $HTTP_PORTS (msg:"BLUETEAM HTTP SQL Injection Attempt"; \
+    flow:to_server,established; \
+    content:"SELECT"; nocase; http.uri; \
+    content:"FROM"; nocase; http.uri; \
+    classtype:web-application-attack; sid:1000010; rev:1;)
+
+# HTTP SQL Injection - UNION based
+alert http any any -> $HTTP_SERVERS $HTTP_PORTS (msg:"BLUETEAM HTTP SQL Injection UNION"; \
+    flow:to_server,established; \
+    content:"UNION"; nocase; http.uri; \
+    content:"SELECT"; nocase; http.uri; \
+    classtype:web-application-attack; sid:1000011; rev:1;)
+
+# HTTP XSS Attempt - Script tag
+alert http any any -> $HTTP_SERVERS $HTTP_PORTS (msg:"BLUETEAM HTTP XSS Script Tag"; \
+    flow:to_server,established; \
+    content:"<script"; nocase; http.uri; \
+    classtype:web-application-attack; sid:1000012; rev:1;)
+
+# HTTP Directory Traversal
+alert http any any -> $HTTP_SERVERS $HTTP_PORTS (msg:"BLUETEAM HTTP Directory Traversal"; \
+    flow:to_server,established; \
+    content:"../"; http.uri; \
+    classtype:web-application-attack; sid:1000013; rev:1;)
+
+# HTTP Shell Command Injection
+alert http any any -> $HTTP_SERVERS $HTTP_PORTS (msg:"BLUETEAM HTTP Command Injection"; \
+    flow:to_server,established; \
+    pcre:"/[;|`].*?(cat|ls|id|whoami|pwd|uname)/i"; \
+    classtype:web-application-attack; sid:1000014; rev:1;)
+
+# HTTP Admin Panel Access
+alert http any any -> $HTTP_SERVERS $HTTP_PORTS (msg:"BLUETEAM HTTP Admin Panel Access"; \
+    flow:to_server,established; \
+    content:"/admin"; http.uri; nocase; \
+    classtype:policy-violation; sid:1000015; rev:1;)
+
+# HTTP PHP Info Access
+alert http any any -> $HTTP_SERVERS $HTTP_PORTS (msg:"BLUETEAM HTTP phpinfo Access"; \
+    flow:to_server,established; \
+    content:"phpinfo"; http.uri; nocase; \
+    classtype:policy-violation; sid:1000016; rev:1;)
+
+# HTTP Sensitive File Access (.env, .git, etc)
+alert http any any -> $HTTP_SERVERS $HTTP_PORTS (msg:"BLUETEAM HTTP Sensitive File Access"; \
+    flow:to_server,established; \
+    pcre:"/\.(env|git|htaccess|htpasswd|config)/i"; \
+    classtype:policy-violation; sid:1000017; rev:1;)
+
+# ----------------------------------------------------------------------------
+# NETWORK RECONNAISSANCE
+# ----------------------------------------------------------------------------
+
+# Port Scan Detection
+alert tcp any any -> $HOME_NET any (msg:"BLUETEAM Possible Port Scan"; \
+    flags:S; \
+    threshold:type threshold, track by_src, count 20, seconds 10; \
+    classtype:network-scan; sid:1000020; rev:1;)
+
+# ICMP Sweep Detection
+alert icmp any any -> $HOME_NET any (msg:"BLUETEAM ICMP Sweep Detected"; \
+    itype:8; \
+    threshold:type threshold, track by_src, count 10, seconds 5; \
+    classtype:network-scan; sid:1000021; rev:1;)
+
+# Nmap Detection - Common Nmap User-Agent
+alert http any any -> $HOME_NET any (msg:"BLUETEAM Nmap Scan Detected"; \
+    flow:to_server,established; \
+    content:"Nmap"; http.user_agent; nocase; \
+    classtype:network-scan; sid:1000022; rev:1;)
+
+# ----------------------------------------------------------------------------
+# DATA EXFILTRATION
+# ----------------------------------------------------------------------------
+
+# Large Data Transfer - Possible Exfiltration
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"BLUETEAM Large Outbound Data Transfer"; \
+    flow:to_server,established; \
+    dsize:>10000; \
+    threshold:type threshold, track by_src, count 100, seconds 60; \
+    classtype:policy-violation; sid:1000030; rev:1;)
+
+# DNS Tunneling - Long DNS Query
+alert dns any any -> any any (msg:"BLUETEAM Possible DNS Tunneling"; \
+    dns.query; \
+    pcre:"/^.{50,}/"; \
+    classtype:policy-violation; sid:1000031; rev:1;)
+
+# ----------------------------------------------------------------------------
+# MALWARE INDICATORS
+# ----------------------------------------------------------------------------
+
+# Reverse Shell Detection - Common patterns
+alert tcp any any -> any any (msg:"BLUETEAM Possible Reverse Shell"; \
+    flow:established; \
+    content:"/bin/sh"; \
+    classtype:trojan-activity; sid:1000040; rev:1;)
+
+# Netcat Reverse Shell
+alert tcp any any -> any any (msg:"BLUETEAM Netcat Reverse Shell"; \
+    flow:established; \
+    content:"nc"; content:"-e"; \
+    classtype:trojan-activity; sid:1000041; rev:1;)
+
+# Base64 Encoded Command
+alert http any any -> $HTTP_SERVERS $HTTP_PORTS (msg:"BLUETEAM Base64 Encoded Command"; \
+    flow:to_server,established; \
+    content:"base64"; nocase; \
+    content:"-d"; \
+    classtype:trojan-activity; sid:1000042; rev:1;)

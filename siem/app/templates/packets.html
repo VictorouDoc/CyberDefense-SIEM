@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Packets{% endblock %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-box-arrow-in-right"></i> Captured Packets</h2>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <input type="text" class="form-control" name="src_ip" placeholder="Source IP" value="{{ request.args.get('src_ip', '') }}">
+            </div>
+            <div class="col-md-3">
+                <input type="text" class="form-control" name="dst_ip" placeholder="Destination IP" value="{{ request.args.get('dst_ip', '') }}">
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" name="protocol">
+                    <option value="">All Protocols</option>
+                    <optgroup label="Transport">
+                        <option value="TCP" {% if request.args.get('protocol') == 'TCP' %}selected{% endif %}>TCP</option>
+                        <option value="UDP" {% if request.args.get('protocol') == 'UDP' %}selected{% endif %}>UDP</option>
+                        <option value="ICMP" {% if request.args.get('protocol') == 'ICMP' %}selected{% endif %}>ICMP</option>
+                    </optgroup>
+                    <optgroup label="Web">
+                        <option value="HTTP" {% if request.args.get('protocol') == 'HTTP' %}selected{% endif %}>HTTP</option>
+                        <option value="HTTPS" {% if request.args.get('protocol') == 'HTTPS' %}selected{% endif %}>HTTPS</option>
+                        <option value="TLS" {% if request.args.get('protocol') == 'TLS' %}selected{% endif %}>TLS</option>
+                    </optgroup>
+                    <optgroup label="Mail">
+                        <option value="SMTP" {% if request.args.get('protocol') == 'SMTP' %}selected{% endif %}>SMTP</option>
+                        <option value="IMAP" {% if request.args.get('protocol') == 'IMAP' %}selected{% endif %}>IMAP</option>
+                        <option value="POP3" {% if request.args.get('protocol') == 'POP3' %}selected{% endif %}>POP3</option>
+                    </optgroup>
+                    <optgroup label="Remote Access">
+                        <option value="SSH" {% if request.args.get('protocol') == 'SSH' %}selected{% endif %}>SSH</option>
+                        <option value="RDP" {% if request.args.get('protocol') == 'RDP' %}selected{% endif %}>RDP</option>
+                        <option value="TELNET" {% if request.args.get('protocol') == 'TELNET' %}selected{% endif %}>TELNET</option>
+                        <option value="VNC" {% if request.args.get('protocol') == 'VNC' %}selected{% endif %}>VNC</option>
+                    </optgroup>
+                    <optgroup label="Database">
+                        <option value="MYSQL" {% if request.args.get('protocol') == 'MYSQL' %}selected{% endif %}>MySQL</option>
+                        <option value="POSTGRES" {% if request.args.get('protocol') == 'POSTGRES' %}selected{% endif %}>PostgreSQL</option>
+                        <option value="REDIS" {% if request.args.get('protocol') == 'REDIS' %}selected{% endif %}>Redis</option>
+                        <option value="MONGODB" {% if request.args.get('protocol') == 'MONGODB' %}selected{% endif %}>MongoDB</option>
+                    </optgroup>
+                    <optgroup label="Other">
+                        <option value="DNS" {% if request.args.get('protocol') == 'DNS' %}selected{% endif %}>DNS</option>
+                        <option value="FTP" {% if request.args.get('protocol') == 'FTP' %}selected{% endif %}>FTP</option>
+                        <option value="SMB" {% if request.args.get('protocol') == 'SMB' %}selected{% endif %}>SMB</option>
+                        <option value="DHCP" {% if request.args.get('protocol') == 'DHCP' %}selected{% endif %}>DHCP</option>
+                    </optgroup>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Filter</button>
+                <a href="/packets" class="btn btn-secondary">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Packets Table -->
+<div class="card">
+    <div class="card-body p-0">
+        <table class="table table-dark table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Protocol</th>
+                    <th>Source</th>
+                    <th>Destination</th>
+                    <th>Length</th>
+                    <th>Flags</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for packet in packets.items %}
+                <tr>
+                    <td>{{ packet.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                    <td>
+                        {% if packet.protocol in ['HTTP', 'HTTPS', 'TLS'] %}
+                        <span class="badge bg-success">{{ packet.protocol }}</span>
+                        {% elif packet.protocol in ['SSH', 'RDP', 'TELNET', 'VNC'] %}
+                        <span class="badge bg-warning text-dark">{{ packet.protocol }}</span>
+                        {% elif packet.protocol in ['MYSQL', 'POSTGRES', 'REDIS', 'MONGODB', 'MSSQL', 'ORACLE'] %}
+                        <span class="badge bg-purple" style="background-color: #6f42c1;">{{ packet.protocol }}</span>
+                        {% elif packet.protocol == 'DNS' %}
+                        <span class="badge bg-info">{{ packet.protocol }}</span>
+                        {% elif packet.protocol in ['SMTP', 'IMAP', 'POP3', 'SMTPS', 'IMAPS', 'POP3S'] %}
+                        <span class="badge bg-secondary">{{ packet.protocol }}</span>
+                        {% elif packet.protocol == 'ICMP' %}
+                        <span class="badge bg-danger">{{ packet.protocol }}</span>
+                        {% else %}
+                        <span class="badge bg-dark">{{ packet.protocol }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ packet.src_ip }}{% if packet.src_port %}:{{ packet.src_port }}{% endif %}</td>
+                    <td>{{ packet.dst_ip }}{% if packet.dst_port %}:{{ packet.dst_port }}{% endif %}</td>
+                    <td>{{ packet.length }} B</td>
+                    <td>{{ packet.flags or '-' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-muted">No packets captured yet</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if packets.pages > 1 %}
+{% set base_query = [] %}
+{% if request.args.get('src_ip') %}{% set _ = base_query.append('src_ip=' + request.args.get('src_ip')) %}{% endif %}
+{% if request.args.get('dst_ip') %}{% set _ = base_query.append('dst_ip=' + request.args.get('dst_ip')) %}{% endif %}
+{% if request.args.get('protocol') %}{% set _ = base_query.append('protocol=' + request.args.get('protocol')) %}{% endif %}
+{% set query_string = '&'.join(base_query) %}
+<nav class="mt-3">
+    <ul class="pagination justify-content-center">
+        {% if packets.has_prev %}
+        <li class="page-item"><a class="page-link" href="?page={{ packets.prev_num }}{% if query_string %}&{{ query_string }}{% endif %}">Previous</a></li>
+        {% endif %}
+        <li class="page-item disabled"><span class="page-link">Page {{ packets.page }} of {{ packets.pages }}</span></li>
+        {% if packets.has_next %}
+        <li class="page-item"><a class="page-link" href="?page={{ packets.next_num }}{% if query_string %}&{{ query_string }}{% endif %}">Next</a></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

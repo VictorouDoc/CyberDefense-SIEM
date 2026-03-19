@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+
+{% block title %}Firewall{% endblock %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-shield-lock"></i> Firewall - IP Ban Management</h2>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="card stat-card alerts">
+            <div class="card-body">
+                <h6 class="card-subtitle">Total Banned</h6>
+                <h2 class="card-title">{{ stats.total_banned }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card critical">
+            <div class="card-body">
+                <h6 class="card-subtitle">Auto-Banned</h6>
+                <h2 class="card-title">{{ stats.auto_banned }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card events">
+            <div class="card-body">
+                <h6 class="card-subtitle">Manual Bans</h6>
+                <h2 class="card-title">{{ stats.manual_banned }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card packets">
+            <div class="card-body">
+                <h6 class="card-subtitle">Packets Blocked</h6>
+                <h2 class="card-title">{{ stats.total_blocked }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card" style="border-left: 4px solid #28a745;">
+            <div class="card-body">
+                <h6 class="card-subtitle">Whitelisted IPs</h6>
+                <h2 class="card-title text-success">{{ stats.whitelisted }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ban IP Form -->
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-plus-circle"></i> Ban IP Address
+    </div>
+    <div class="card-body">
+        <form method="post" action="/firewall/ban" class="row g-3">
+            <div class="col-md-3">
+                <input type="text" class="form-control" name="ip_address" placeholder="IP Address (e.g., 192.168.1.100)" required pattern="^(\d{1,3}\.){3}\d{1,3}$">
+            </div>
+            <div class="col-md-3">
+                <input type="text" class="form-control" name="reason" placeholder="Reason (optional)" value="Manual ban">
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" name="duration">
+                    <option value="1h">1 Hour</option>
+                    <option value="6h">6 Hours</option>
+                    <option value="24h" selected>24 Hours</option>
+                    <option value="7d">7 Days</option>
+                    <option value="30d">30 Days</option>
+                    <option value="permanent">Permanent</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-danger w-100">
+                    <i class="bi bi-shield-x"></i> Ban IP
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Filter -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <select class="form-select" name="status">
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Bans</option>
+                    <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Bans</option>
+                    <option value="expired" {% if status_filter == 'expired' %}selected{% endif %}>Expired/Removed</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-funnel"></i> Filter</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Banned IPs Table -->
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-list-ul"></i> Banned IP Addresses
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-dark table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>IP Address</th>
+                    <th>Type</th>
+                    <th>Reason</th>
+                    <th>Banned At</th>
+                    <th>Expires</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ban in banned_ips %}
+                <tr>
+                    <td>
+                        <a href="/packets?src_ip={{ ban.ip_address }}">{{ ban.ip_address }}</a>
+                    </td>
+                    <td>
+                        {% if ban.ban_type == 'manual' %}
+                        <span class="badge bg-secondary">Manual</span>
+                        {% elif ban.ban_type == 'ddos' or 'ddos' in ban.ban_type %}
+                        <span class="badge bg-danger">DDoS</span>
+                        {% elif ban.ban_type == 'port_scan' %}
+                        <span class="badge bg-warning text-dark">Port Scan</span>
+                        {% elif ban.ban_type == 'attack' %}
+                        <span class="badge bg-danger">Attack</span>
+                        {% else %}
+                        <span class="badge bg-info">{{ ban.ban_type }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ ban.reason or '-' }}</td>
+                    <td>{{ ban.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                    <td>
+                        {% if ban.expires_at %}
+                            {{ ban.expires_at.strftime('%Y-%m-%d %H:%M') }}
+                        {% else %}
+                            <span class="text-danger">Permanent</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if ban.is_active and not ban.is_expired %}
+                        <span class="badge bg-danger">Active</span>
+                        {% elif ban.is_expired %}
+                        <span class="badge bg-secondary">Expired</span>
+                        {% else %}
+                        <span class="badge bg-success">Removed</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if ban.is_active %}
+                        <form method="post" action="/firewall/unban/{{ ban.id }}" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Unban {{ ban.ip_address }}?')">
+                                <i class="bi bi-shield-check"></i> Unban
+                            </button>
+                        </form>
+                        {% endif %}
+                        {% if ban.alert_id %}
+                        <a href="/alerts/{{ ban.alert_id }}" class="btn btn-sm btn-info">
+                            <i class="bi bi-info-circle"></i>
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-center">No banned IPs</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- DDoS Protection Settings Info -->
+<div class="card mt-4">
+    <div class="card-header">
+        <i class="bi bi-gear"></i> DDoS Protection Settings
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Detection Thresholds</h6>
+                <ul class="list-unstyled">
+                    <li><strong>Packet Flood:</strong> 100 packets / 10 seconds</li>
+                    <li><strong>SYN Flood:</strong> 50 SYN packets / 10 seconds</li>
+                    <li><strong>Port Scan:</strong> 10+ ports / 60 seconds</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6>Auto-Ban Settings</h6>
+                <ul class="list-unstyled">
+                    <li><strong>Auto-Ban:</strong> <span class="badge bg-success">Enabled</span></li>
+                    <li><strong>Default Ban Duration:</strong> 1 hour</li>
+                    <li><strong>Method:</strong> iptables DROP</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- IP Whitelist Management -->
+<div class="card mt-4">
+    <div class="card-header">
+        <i class="bi bi-shield-check"></i> IP Whitelist Management
+    </div>
+    <div class="card-body">
+        <!-- Add to Whitelist Form -->
+        <form method="post" action="/firewall/whitelist/add" class="row g-3 mb-4">
+            <div class="col-md-4">
+                <input type="text" class="form-control" name="ip_address" placeholder="IP Address (e.g., 192.168.1.100)" required pattern="^(\d{1,3}\.){3}\d{1,3}$">
+            </div>
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="description" placeholder="Description (e.g., Admin workstation)">
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-success w-100">
+                    <i class="bi bi-plus-circle"></i> Add to Whitelist
+                </button>
+            </div>
+        </form>
+
+        <div class="row">
+            <!-- Default Whitelist -->
+            <div class="col-md-6">
+                <h6 class="text-muted mb-3"><i class="bi bi-lock"></i> Default Whitelist (Protected)</h6>
+                <table class="table table-dark table-sm">
+                    <thead>
+                        <tr>
+                            <th>IP Address</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ip in default_whitelist %}
+                        <tr>
+                            <td><code>{{ ip }}</code></td>
+                            <td class="text-muted">
+                                {% if ip == '127.0.0.1' %}Localhost
+                                {% elif ip == '10.0.0.1' %}Internal gateway
+                                {% elif ip == '10.0.0.15' %}Bastion host
+                                {% elif ip == '192.168.1.1' %}Internal network
+                                {% elif ip == '192.168.1.100' %}Bastion eth1
+                                {% else %}System IP{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Custom Whitelist -->
+            <div class="col-md-6">
+                <h6 class="text-muted mb-3"><i class="bi bi-person-check"></i> Custom Whitelist</h6>
+                <table class="table table-dark table-sm">
+                    <thead>
+                        <tr>
+                            <th>IP Address</th>
+                            <th>Description</th>
+                            <th>Added</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in whitelist_ips %}
+                        <tr>
+                            <td><code>{{ entry.ip_address }}</code></td>
+                            <td>{{ entry.description or '-' }}</td>
+                            <td class="text-muted">{{ entry.created_at.strftime('%Y-%m-%d') }}</td>
+                            <td>
+                                <form method="post" action="/firewall/whitelist/remove/{{ entry.id }}" style="display:inline;">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove {{ entry.ip_address }} from whitelist?')" title="Remove from whitelist">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-center text-muted">No custom whitelist entries</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

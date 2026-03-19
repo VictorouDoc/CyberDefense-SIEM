@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Packet Explorer{% endblock %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-search"></i> Packet Explorer</h2>
+
+<!-- Protocol Selector -->
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-funnel"></i> Capture a Single Packet</div>
+    <div class="card-body">
+        <p>Select a protocol type and click to capture one packet for detailed analysis. No data is stored in the database.</p>
+        <form method="post" action="/packets/explore/capture" id="captureForm">
+            <input type="hidden" name="protocol" id="selectedProtocol" value="ANY">
+            <div class="d-flex flex-wrap gap-2">
+                {% set proto_icons = {
+                    'ANY': 'bi-asterisk', 'TCP': 'bi-arrow-left-right', 'UDP': 'bi-arrow-right',
+                    'ICMP': 'bi-broadcast-pin', 'HTTP': 'bi-globe', 'HTTPS': 'bi-lock',
+                    'DNS': 'bi-signpost', 'SSH': 'bi-terminal', 'SMTP': 'bi-envelope',
+                    'FTP': 'bi-folder', 'REDIS': 'bi-database', 'MYSQL': 'bi-database-fill',
+                    'POP3': 'bi-inbox', 'IMAP': 'bi-inbox-fill', 'RDP': 'bi-display',
+                    'SMB': 'bi-hdd-network'
+                } %}
+                {% set proto_colors = {
+                    'ANY': 'secondary', 'TCP': 'dark', 'UDP': 'dark', 'ICMP': 'danger',
+                    'HTTP': 'success', 'HTTPS': 'success', 'DNS': 'info', 'SSH': 'warning',
+                    'SMTP': 'secondary', 'FTP': 'primary', 'REDIS': 'purple', 'MYSQL': 'purple',
+                    'POP3': 'secondary', 'IMAP': 'secondary', 'RDP': 'warning', 'SMB': 'dark'
+                } %}
+                {% for proto in protocols %}
+                <button type="button" class="btn btn-outline-{{ proto_colors.get(proto, 'secondary') }} capture-btn"
+                        data-protocol="{{ proto }}" onclick="capturePacket('{{ proto }}')">
+                    <i class="bi {{ proto_icons.get(proto, 'bi-box') }}"></i> {{ proto }}
+                </button>
+                {% endfor %}
+            </div>
+        </form>
+        <div id="captureSpinner" class="mt-3 d-none">
+            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+            <span>Capturing <span id="captureProtoLabel"></span> packet... (timeout: 10s)</span>
+        </div>
+    </div>
+</div>
+
+{% if error %}
+<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> {{ error }}</div>
+{% endif %}
+
+{% if packet %}
+<!-- Packet Summary -->
+<div class="card mb-4">
+    <div class="card-header bg-success text-white">
+        <i class="bi bi-check-circle"></i> Packet Captured Successfully
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Capture Time:</strong> {{ packet.capture_time }}</p>
+                <p><strong>Requested Protocol:</strong> <span class="badge bg-primary">{{ packet.requested_protocol }}</span></p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Total Size:</strong> {{ packet.total_length }} bytes</p>
+                <p><strong>Summary:</strong> <code>{{ packet.summary }}</code></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Protocol Layers -->
+{% for layer in packet.layers %}
+<div class="card mb-3">
+    <div class="card-header">
+        <i class="bi bi-layers"></i> {{ layer.name }}
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-dark table-striped mb-0">
+            <thead>
+                <tr>
+                    <th style="width: 30%;">Field</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for field, value in layer.fields.items() %}
+                <tr>
+                    <td><strong>{{ field }}</strong></td>
+                    <td>
+                        {% if field in ['Preview (text)', 'Preview (hex)'] %}
+                        <pre class="mb-0" style="white-space: pre-wrap; color: #63b3ed; font-size: 0.85rem;">{{ value }}</pre>
+                        {% else %}
+                        <code>{{ value }}</code>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Hex Dump (Wireshark-style) -->
+{% if packet.hex_dump %}
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-file-binary"></i> Raw Hex Dump (first 512 bytes)
+    </div>
+    <div class="card-body">
+        <pre style="color: #63b3ed; font-family: 'Courier New', monospace; font-size: 0.85rem; line-height: 1.4; margin: 0;">{{ packet.hex_dump }}</pre>
+    </div>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function capturePacket(proto) {
+    document.getElementById('selectedProtocol').value = proto;
+    document.getElementById('captureSpinner').classList.remove('d-none');
+    document.getElementById('captureProtoLabel').textContent = proto;
+    // Disable all buttons
+    document.querySelectorAll('.capture-btn').forEach(btn => btn.disabled = true);
+    document.getElementById('captureForm').submit();
+}
+</script>
+{% endblock %}

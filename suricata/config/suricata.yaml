@@ -1,0 +1,92 @@
+# Suricata Configuration - [ORGANIZATION] Blue Team - IDS
+# Minimal configuration for IDS deployment
+
+%YAML 1.1
+---
+
+# Network variables
+vars:
+  address-groups:
+    HOME_NET: "[192.168.0.0/16,10.0.0.0/8,172.16.0.0/12]"
+    EXTERNAL_NET: "!$HOME_NET"
+    HTTP_SERVERS: "$HOME_NET"
+    SSH_SERVERS: "$HOME_NET"
+    DNS_SERVERS: "$HOME_NET"
+
+  port-groups:
+    HTTP_PORTS: "[80,8080,8081,8082,8083,8084,8085,8086,8087,8088,8089,8090]"
+    SSH_PORTS: "[22,221,222,223,224,225,226,227,228,229,230]"
+
+# Logging outputs
+outputs:
+  # EVE JSON log - main log format for SIEM integration
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: /var/log/suricata/eve.json
+      types:
+        - alert:
+            tagged-packets: yes
+        - http:
+            extended: yes
+        - dns
+        - tls:
+            extended: yes
+        - files:
+            force-magic: yes
+        - ssh
+        - flow
+
+  # Fast log - quick alerts overview
+  - fast:
+      enabled: yes
+      filename: /var/log/suricata/fast.log
+      append: yes
+
+  # Stats log - performance metrics
+  - stats:
+      enabled: yes
+      filename: /var/log/suricata/stats.log
+      interval: 60
+
+# Rule files
+default-rule-path: /etc/suricata/rules
+rule-files:
+  - suricata.rules
+  - custom-blueteam.rules
+
+# App layer protocols
+app-layer:
+  protocols:
+    http:
+      enabled: yes
+    ssh:
+      enabled: yes
+    tls:
+      enabled: yes
+    dns:
+      enabled: yes
+
+# Threading - adjust based on server capabilities
+threading:
+  set-cpu-affinity: no
+  detect-thread-ratio: 1.0
+
+# Detection engine
+detect:
+  profile: medium
+  sgh-mpm-context: auto
+
+# Logging
+logging:
+  default-log-level: notice
+  outputs:
+    - console:
+        enabled: yes
+    - file:
+        enabled: yes
+        filename: /var/log/suricata/suricata.log
+
+# Coredump
+coredump:
+  max-dump: unlimited

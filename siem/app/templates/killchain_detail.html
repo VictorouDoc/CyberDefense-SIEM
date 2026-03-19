@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Attack Chain #{{ chain.id }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/killchain">Kill Chain</a></li>
+        <li class="breadcrumb-item active">Chain #{{ chain.id }}</li>
+    </ol>
+</nav>
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h4 class="mb-0">
+            <span class="badge bg-{% if chain.severity == 'critical' %}danger{% elif chain.severity == 'high' %}warning text-dark{% elif chain.severity == 'medium' %}info{% else %}secondary{% endif %}">
+                {{ chain.severity|upper }}
+            </span>
+            {{ chain.title }}
+        </h4>
+        <span class="badge bg-{% if chain.status == 'active' %}danger{% else %}success{% endif %}">
+            {{ chain.status|upper }}
+        </span>
+    </div>
+    <div class="card-body">
+        <!-- Kill Chain Phase Timeline -->
+        <h5 class="mb-3"><i class="bi bi-diagram-3"></i> Kill Chain Phases</h5>
+        <div class="d-flex justify-content-between mb-4" style="gap: 4px;">
+            {% set all_phases = ['reconnaissance', 'initial_access', 'execution', 'lateral_movement', 'command_control', 'exfiltration', 'impact'] %}
+            {% set phase_labels = {
+                'reconnaissance': 'Reconnaissance',
+                'initial_access': 'Initial Access',
+                'execution': 'Execution',
+                'lateral_movement': 'Lateral Movement',
+                'command_control': 'Command & Control',
+                'exfiltration': 'Exfiltration',
+                'impact': 'Impact'
+            } %}
+            {% set phase_icons = {
+                'reconnaissance': 'bi-search',
+                'initial_access': 'bi-door-open',
+                'execution': 'bi-terminal',
+                'lateral_movement': 'bi-arrows-move',
+                'command_control': 'bi-broadcast',
+                'exfiltration': 'bi-cloud-upload',
+                'impact': 'bi-lightning'
+            } %}
+            {% set phase_desc = {
+                'reconnaissance': 'Scanning, probing, enumeration',
+                'initial_access': 'Brute force, injection, exploitation',
+                'execution': 'Code execution, RCE, exploits',
+                'lateral_movement': 'Pivoting between internal systems',
+                'command_control': 'C2 beaconing, callback',
+                'exfiltration': 'Data theft via DNS/HTTP',
+                'impact': 'DDoS, destruction, disruption'
+            } %}
+            {% for phase in all_phases %}
+            {% set active = phase in (chain.kill_chain_phases or []) %}
+            <div class="text-center flex-fill p-3 rounded" style="background-color: {% if active %}{% if chain.severity == 'critical' %}#dc354580{% elif chain.severity == 'high' %}#fd7e1480{% else %}#17a2b880{% endif %}{% else %}#1a1a40{% endif %}; border: 2px solid {% if active %}{% if chain.severity == 'critical' %}#dc3545{% elif chain.severity == 'high' %}#fd7e14{% else %}#17a2b8{% endif %}{% else %}#333{% endif %};">
+                <i class="bi {{ phase_icons[phase] }} d-block mb-1" style="font-size: 1.5rem;"></i>
+                <strong>{{ phase_labels[phase] }}</strong>
+                <br><small class="text-muted">{{ phase_desc[phase] }}</small>
+                {% if active %}
+                <br><span class="badge bg-success mt-1">DETECTED</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <hr>
+
+        <!-- Details -->
+        <div class="row">
+            <div class="col-md-6">
+                <h5>Attack Details</h5>
+                <p><strong>Source IP:</strong> <code>{{ chain.source_ip }}</code></p>
+                <p><strong>First seen:</strong> {{ chain.first_seen.strftime('%Y-%m-%d %H:%M:%S') if chain.first_seen else 'N/A' }}</p>
+                <p><strong>Last seen:</strong> {{ chain.last_seen.strftime('%Y-%m-%d %H:%M:%S') if chain.last_seen else 'N/A' }}</p>
+                <p><strong>Duration:</strong>
+                    {% if chain.first_seen and chain.last_seen %}
+                        {% set duration = (chain.last_seen - chain.first_seen).total_seconds() %}
+                        {% if duration < 60 %}{{ duration|int }}s
+                        {% elif duration < 3600 %}{{ (duration / 60)|int }}m {{ (duration % 60)|int }}s
+                        {% else %}{{ (duration / 3600)|int }}h {{ ((duration % 3600) / 60)|int }}m
+                        {% endif %}
+                    {% else %}N/A{% endif %}
+                </p>
+                <p><strong>Total events:</strong> {{ chain.event_count }}</p>
+                <p><strong>Phases detected:</strong> {{ (chain.kill_chain_phases or [])|length }} / 7</p>
+            </div>
+            <div class="col-md-6">
+                <h5>Event Types Observed</h5>
+                {% for et in (chain.event_types or []) %}
+                <span class="badge bg-secondary mb-1" style="font-size: 0.85rem;">{{ et }}</span>
+                {% endfor %}
+
+                {% if chain.alert_ids %}
+                <h5 class="mt-3">Related Alerts</h5>
+                {% for aid in (chain.alert_ids or []) %}
+                <a href="/alerts/{{ aid }}" class="badge bg-danger mb-1" style="font-size: 0.85rem; text-decoration: none;">Alert #{{ aid }}</a>
+                {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+
+        <hr>
+
+        {% if chain.status == 'active' %}
+        <form method="post" action="/killchain/{{ chain.id }}/resolve" class="d-inline">
+            <button type="submit" class="btn btn-success"><i class="bi bi-check-circle"></i> Mark as Resolved</button>
+        </form>
+        {% endif %}
+        <a href="/killchain" class="btn btn-outline-secondary">Back to Kill Chains</a>
+    </div>
+</div>
+{% endblock %}
